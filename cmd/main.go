@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	tags, err := parser.ParseTagsTSV("cmd/example_tags.tsv")
+	tags, err := parser.ParseTagsTSV("/home/maimus/GoProjects/OPCvsModSymSrv/cmd/example_tags.tsv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,6 +26,6 @@ func main() {
 			log.Printf("Error reading %s: %v", tag.Name, err)
 			continue
 		}
-		fmt.Printf("%s [%s] = %v\n", tag.Name, tag.RegisterType, val)
+		fmt.Printf("%s [%s] = %s\n", tag.Name, tag.RegisterType, client.FormatTagValue(tag, val))
 	}
 }

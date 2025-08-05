@@ -113,3 +113,69 @@ func float32FromBits(bits uint32) float32 {
 func float32FromUint32(bits uint32) float32 {
 	return *(*float32)(unsafe.Pointer(&bits))
 }
+
+// Example function to demonstrate reading a tag and handling the value
+func ExampleReadTag(client *Client, tag model.ModbusTag) {
+	val, err := client.ReadTag(tag)
+	if err != nil {
+		fmt.Printf("Failed to read tag: %v\n", err)
+		return
+	}
+
+	switch v := val.(type) {
+	case map[string]any:
+		// Print only float32 and int32 if present
+		if f, ok := v["float32"].(float32); ok {
+			fmt.Printf("%s [%s] float32: %v\n", tag.Name, tag.RegisterType, f)
+		}
+		if i, ok := v["int32"].(int32); ok {
+			fmt.Printf("%s [%s] int32: %v\n", tag.Name, tag.RegisterType, i)
+		}
+	default:
+		// For single register or other types
+		fmt.Printf("%s [%s] = %v\n", tag.Name, tag.RegisterType, val)
+	}
+}
+
+// FormatTagValue returns a string with the most reasonable interpretation first
+func (c *Client) FormatTagValue(tag model.ModbusTag, val any) string {
+	switch v := val.(type) {
+	case map[string]any:
+		var f float32
+		var i int32
+		var hasFloat, hasInt bool
+
+		if fVal, ok := v["float32"].(float32); ok {
+			f = fVal
+			hasFloat = true
+		}
+		if iVal, ok := v["int32"].(int32); ok {
+			i = iVal
+			hasInt = true
+		}
+
+		if !hasFloat || !hasInt {
+			return fmt.Sprintf("float32: %v int32: %v", f, i)
+		}
+
+		// Heuristic: prefer float32 if it's in a reasonable range (like your example of 60)
+		if f >= 0 && f < 100000 && f == float32(int(f)) {
+			// Whole number that makes sense as float
+			return fmt.Sprintf("float32: %v (int32: %v)", f, i)
+		}
+		if f > 0.001 && f < 1000000 {
+			// Reasonable float range
+			return fmt.Sprintf("float32: %v (int32: %v)", f, i)
+		}
+
+		// Prefer int32 if it's a reasonable integer and float looks like garbage
+		if i >= 0 && i < 100000 {
+			return fmt.Sprintf("int32: %v (float32: %v)", i, f)
+		}
+
+		// Default: show both with float32 first
+		return fmt.Sprintf("float32: %v int32: %v", f, i)
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
