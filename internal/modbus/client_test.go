@@ -7,7 +7,7 @@ import (
 )
 
 func TestModbusConnection(t *testing.T) {
-	client, err := NewClient("127.0.0.1:502")
+	client, err := NewClient("172.29.48.69:502")
 	if err != nil {
 		t.Fatalf("Modbus server not available: %v", err)
 	}
