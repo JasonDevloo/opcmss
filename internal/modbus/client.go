@@ -114,29 +114,6 @@ func float32FromUint32(bits uint32) float32 {
 	return *(*float32)(unsafe.Pointer(&bits))
 }
 
-// Example function to demonstrate reading a tag and handling the value
-func ExampleReadTag(client *Client, tag model.ModbusTag) {
-	val, err := client.ReadTag(tag)
-	if err != nil {
-		fmt.Printf("Failed to read tag: %v\n", err)
-		return
-	}
-
-	switch v := val.(type) {
-	case map[string]any:
-		// Print only float32 and int32 if present
-		if f, ok := v["float32"].(float32); ok {
-			fmt.Printf("%s [%s] float32: %v\n", tag.Name, tag.RegisterType, f)
-		}
-		if i, ok := v["int32"].(int32); ok {
-			fmt.Printf("%s [%s] int32: %v\n", tag.Name, tag.RegisterType, i)
-		}
-	default:
-		// For single register or other types
-		fmt.Printf("%s [%s] = %v\n", tag.Name, tag.RegisterType, val)
-	}
-}
-
 // FormatTagValue returns a string with the most reasonable interpretation first
 func (c *Client) FormatTagValue(tag model.ModbusTag, val any) string {
 	switch v := val.(type) {
