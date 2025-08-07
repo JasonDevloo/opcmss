@@ -3,16 +3,23 @@ package modbus
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"time"
-	"unsafe"
 
 	"opcmss/internal/model"
 
 	"github.com/simonvetter/modbus"
 )
 
+type ModbusClient interface {
+	ReadCoils(address, quantity uint16) ([]bool, error)
+	ReadRegisters(address, quantity uint16, regType modbus.RegType) ([]uint16, error)
+	Open() error
+	Close() error
+}
+
 type Client struct {
-	client *modbus.ModbusClient
+	client ModbusClient
 }
 
 func NewClient(address string) (*Client, error) {
@@ -106,12 +113,59 @@ func (c *Client) Close() {
 	c.client.Close()
 }
 
+func NewClientWithModbus(client ModbusClient) *Client {
+	return &Client{client: client}
+}
+
 func float32FromBits(bits uint32) float32 {
 	return float32FromUint32(bits)
 }
 
 func float32FromUint32(bits uint32) float32 {
-	return *(*float32)(unsafe.Pointer(&bits))
+	return math.Float32frombits(bits)
+}
+
+// ExtractBestValue returns the single most reasonable numeric value for comparison
+func (c *Client) ExtractBestValue(val any) any {
+	switch v := val.(type) {
+	case map[string]any:
+		var f float32
+		var i int32
+		var hasFloat, hasInt bool
+
+		if fVal, ok := v["float32"].(float32); ok {
+			f = fVal
+			hasFloat = true
+		}
+		if iVal, ok := v["int32"].(int32); ok {
+			i = iVal
+			hasInt = true
+		}
+
+		if !hasFloat || !hasInt {
+			return val // Return original if we can't extract both
+		}
+
+		// Use same heuristic as FormatTagValue to pick the most reasonable value
+		if f >= 0 && f < 100000 && f == float32(int(f)) {
+			// Whole number that makes sense as float - return the float
+			return f
+		}
+		if f > 0.001 && f < 1000000 {
+			// Reasonable float range - return float
+			return f
+		}
+
+		// Prefer int32 if it's a reasonable integer and float looks unrealistic
+		if i >= 0 && i < 100000 {
+			return i
+		}
+
+		// Default: return float32 (most common for industrial sensors)
+		return f
+	default:
+		return val // Return as-is for non-map values
+	}
 }
 
 // FormatTagValue returns a string with the most reasonable interpretation first

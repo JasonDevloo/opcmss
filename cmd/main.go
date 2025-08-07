@@ -123,7 +123,9 @@ func compareValues(opcValue, modbusValue any, registerType string) bool {
 	case "HoldingRegister", "InputRegister":
 		// Handle different numeric types
 		opcFloat := convertToFloat64(opcValue)
-		modbusFloat := convertToFloat64(modbusValue)
+		// Extract the best value from modbus (handles map[string]any for 2-register values)
+		bestModbusValue := extractBestModbusValue(modbusValue)
+		modbusFloat := convertToFloat64(bestModbusValue)
 
 		if opcFloat == nil || modbusFloat == nil {
 			return false
@@ -139,6 +141,50 @@ func compareValues(opcValue, modbusValue any, registerType string) bool {
 	default:
 		return fmt.Sprintf("%v", opcValue) == fmt.Sprintf("%v", modbusValue)
 	}
+}
+
+// extractBestModbusValue extracts the most reasonable value from modbus reading
+func extractBestModbusValue(value any) any {
+	// Handle modbus map results (2-register values)
+	if mapVal, ok := value.(map[string]any); ok {
+		var f float32
+		var i int32
+		var hasFloat, hasInt bool
+
+		if fVal, ok := mapVal["float32"].(float32); ok {
+			f = fVal
+			hasFloat = true
+		}
+		if iVal, ok := mapVal["int32"].(int32); ok {
+			i = iVal
+			hasInt = true
+		}
+
+		if !hasFloat || !hasInt {
+			return value // Return original if we can't extract both
+		}
+
+		// Use same heuristic as modbus FormatTagValue to pick the most reasonable value
+		if f >= 0 && f < 100000 && f == float32(int(f)) {
+			// Whole number that makes sense as float - return the float
+			return f
+		}
+		if f > 0.001 && f < 1000000 {
+			// Reasonable float range - return float
+			return f
+		}
+
+		// Prefer int32 if it's a reasonable integer and float looks unrealistic
+		if i >= 0 && i < 100000 {
+			return i
+		}
+
+		// Default: return float32 (most common for industrial sensors)
+		return f
+	}
+
+	// Return as-is for non-map values (single register, coils, etc.)
+	return value
 }
 
 // convertToFloat64 converts various numeric types to float64

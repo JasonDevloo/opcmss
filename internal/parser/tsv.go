@@ -27,7 +27,7 @@ func ParseTagsTSV(filename string) ([]model.ModbusTag, error) {
 	var tags []model.ModbusTag
 	for _, record := range records {
 		if len(record) < 1 {
-			continue // Skip incomplete records
+			continue // Skip empty records
 		}
 
 		address, err := strconv.ParseUint(record[2], 10, 16)
